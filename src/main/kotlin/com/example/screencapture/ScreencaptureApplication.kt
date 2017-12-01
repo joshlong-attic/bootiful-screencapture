@@ -25,8 +25,7 @@ import javax.imageio.stream.FileImageOutputStream
 @SpringBootApplication
 class ScreencaptureApplication {
 
-    class ScreenCaptureApplicationRunner(
-            private val imgs: File, private val out: File) : ApplicationRunner {
+    class ScreenCaptureApplicationRunner(private val imgs: File, private val out: File) : ApplicationRunner {
 
         private val log = LogFactory.getLog(javaClass)
 
