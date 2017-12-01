@@ -10,7 +10,7 @@ import javax.imageio.metadata.IIOMetadataNode
 import javax.imageio.stream.ImageOutputStream
 
 /**
- * Ported from Elliot Kroo's Java code to Kotlin.
+ * This code is entirely Elliot Kroo's brilliance. All I (Josh) did was port it to Kotlin.
  *
  * @author Elliot Kroo (elliot[at]kroo[dot]net)
  * @author Josh Long
@@ -67,7 +67,7 @@ class GifSequenceWriter(
     }
 
     override fun close() {
-        log.info("${GifSequenceWriter::class.java.name}#close()")
+        log.debug ("finished. ${GifSequenceWriter::class.java.name}#close()")
         gifWriter.endWriteSequence()
     }
 
