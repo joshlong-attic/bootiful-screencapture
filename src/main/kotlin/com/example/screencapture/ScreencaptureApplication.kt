@@ -27,16 +27,14 @@ class ScreencaptureApplication {
 
     class ScreenCaptureApplicationRunner(
             private val imgs: File,
-            private val out: File,
-            private val executor: ExecutorService) : ApplicationRunner {
+            private val out: File) : ApplicationRunner {
 
         private val log = LogFactory.getLog(javaClass)
 
         override fun run(args: ApplicationArguments?) {
 
             fun transcode(files: List<File>, timeBetweenFramesMS: Long, targetGif: File) {
-                log.debug("transcoding. ")
-//                val files = inputFiles.sortedWith(Comparator { a, b -> a.compareTo(b) })
+                log.debug("transcoding to ${targetGif.absolutePath}.")
                 FileImageOutputStream(targetGif).use { output ->
                     log.debug("writing to ${GifSequenceWriter::class.java.name}.")
                     GifSequenceWriter(output, ImageIO.read(files[0]).type, timeBetweenFramesMS, false).use { writer ->
@@ -55,17 +53,17 @@ class ScreencaptureApplication {
                 return ImageIO.write(screenFullImage, "png", out)
             }
 
-            fun captureUntil(fps: Int, imgDirectory: File, finish: Instant): Long {
+            fun captureUntil(fps: Int, imgDir: File, recordTest: () -> Boolean, executor: ExecutorService): Long {
                 val intervalInMs: Long = ((1.0 / (fps * 1.0)) * 1000.0).toLong()
                 val semaphore = Semaphore(0)
                 val permits = AtomicLong()
-                while (Instant.now().isBefore(finish)) {
+                while (recordTest()) {
                     permits.incrementAndGet()
                     val id = permits.get()
                     log.debug("submitting task #${id}.")
                     executor.submit({
                         val fn = String.format("%05d", id)
-                        val file = File(imgDirectory, "${fn}.png")
+                        val file = File(imgDir, "${fn}.png")
                         capture(file)
                         semaphore.release()
                         log.debug("processed ${file.absolutePath}.")
@@ -77,24 +75,26 @@ class ScreencaptureApplication {
                 return intervalInMs
             }
 
-            val intervalInMs = captureUntil(15, imgs, Instant.now().plus(Duration.ofSeconds(2)))
-            val files = imgs
-                    .listFiles(FileFilter {
-                        it.extension == "png"
-                    })
-                    .sortedWith(Comparator { a, b -> a.path.compareTo(b.path) })
+            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()).also { executor ->
+                val finish = Instant.now().plus(Duration.ofSeconds(2))
+                log.debug("recording until ${finish}.")
+                val intervalInMs = captureUntil(15, imgs, { Instant.now().isBefore(finish) }, executor)
+                log.debug("interval in milliseconds: ${intervalInMs}.")
+                val files = imgs
+                        .listFiles(FileFilter {
+                            it.extension == "png"
+                        })
+                        .sortedWith(Comparator { a, b -> a.path.compareTo(b.path) })
 
-            transcode(files, intervalInMs, out)
-            log.debug("wrote an animated gif to ${out.absolutePath}")
+                transcode(files, intervalInMs, out)
+                log.debug("wrote an animated gif to ${out.absolutePath}")
+                executor.shutdown()
+            }
         }
-
     }
 
-    @Bean(destroyMethod = "shutdown")
-    fun executor() = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
-
     @Bean
-    fun run(@Value("\${HOME}") home: File, executor: ExecutorService): ApplicationRunner {
+    fun run(@Value("\${HOME}") home: File): ApplicationRunner {
         System.setProperty("java.awt.headless", "false")
         val target = File(File(home, "/Desktop"), "out").apply {
             deleteRecursively()
@@ -103,7 +103,7 @@ class ScreencaptureApplication {
             mkdirs()
         }
         val out = File(target, "/out.gif")
-        return ScreenCaptureApplicationRunner(imgs, out, executor)
+        return ScreenCaptureApplicationRunner(imgs, out)
     }
 }
 
