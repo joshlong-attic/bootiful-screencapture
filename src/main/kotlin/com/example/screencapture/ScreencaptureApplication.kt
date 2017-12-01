@@ -34,8 +34,9 @@ class ScreencaptureApplication {
 
         override fun run(args: ApplicationArguments?) {
 
-            fun transcode(files: Array<File>, timeBetweenFramesMS: Long, targetGif: File) {
-                log.debug("transcode time!")
+            fun transcode(files: List<File>, timeBetweenFramesMS: Long, targetGif: File) {
+                log.debug("transcoding. ")
+//                val files = inputFiles.sortedWith(Comparator { a, b -> a.compareTo(b) })
                 FileImageOutputStream(targetGif).use { output ->
                     log.debug("writing to ${GifSequenceWriter::class.java.name}.")
                     GifSequenceWriter(output, ImageIO.read(files[0]).type, timeBetweenFramesMS, false).use { writer ->
@@ -63,7 +64,8 @@ class ScreencaptureApplication {
                     val id = permits.get()
                     log.debug("submitting task #${id}.")
                     executor.submit({
-                        val file = File(imgDirectory, "${id}.png")
+                        val fn = String.format("%05d", id)
+                        val file = File(imgDirectory, "${fn}.png")
                         capture(file)
                         semaphore.release()
                         log.debug("processed ${file.absolutePath}.")
@@ -76,9 +78,12 @@ class ScreencaptureApplication {
             }
 
             val intervalInMs = captureUntil(15, imgs, Instant.now().plus(Duration.ofSeconds(2)))
-            val files = imgs.listFiles(FileFilter {
-                it.extension == "png"
-            })
+            val files = imgs
+                    .listFiles(FileFilter {
+                        it.extension == "png"
+                    })
+                    .sortedWith(Comparator { a, b -> a.path.compareTo(b.path) })
+
             transcode(files, intervalInMs, out)
             log.debug("wrote an animated gif to ${out.absolutePath}")
         }
@@ -91,8 +96,10 @@ class ScreencaptureApplication {
     @Bean
     fun run(@Value("\${HOME}") home: File, executor: ExecutorService): ApplicationRunner {
         System.setProperty("java.awt.headless", "false")
-        val target = File(File(home, "/Desktop"), "out")
-        val imgs: File = File(target, "/captured/").apply {
+        val target = File(File(home, "/Desktop"), "out").apply {
+            deleteRecursively()
+        }
+        val imgs = File(target, "/captured/").apply {
             mkdirs()
         }
         val out = File(target, "/out.gif")
