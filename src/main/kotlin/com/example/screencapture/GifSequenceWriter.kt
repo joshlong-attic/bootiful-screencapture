@@ -1,5 +1,6 @@
 package com.example.screencapture
 
+import org.apache.commons.logging.LogFactory
 import java.awt.image.RenderedImage
 import java.io.Closeable
 import javax.imageio.IIOImage
@@ -24,6 +25,7 @@ class GifSequenceWriter(
     private val imageWriteParam = gifWriter.defaultWriteParam
     private val imageTypeSpecifier = ImageTypeSpecifier.createFromBufferedImageType(imageType)
     private val imageMetaData = gifWriter.getDefaultImageMetadata(this.imageTypeSpecifier, this.imageWriteParam)
+    private val log = LogFactory.getLog(javaClass)
 
     init {
 
@@ -65,6 +67,7 @@ class GifSequenceWriter(
     }
 
     override fun close() {
+        log.info("${GifSequenceWriter::class.java.name}#close()")
         gifWriter.endWriteSequence()
     }
 
